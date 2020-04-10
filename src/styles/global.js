@@ -1,4 +1,5 @@
 import { createGlobalStyle } from 'styled-components';
+import 'react-toastify/dist/ReactToastify.css';
 
 export default createGlobalStyle`
   * {
@@ -13,7 +14,7 @@ export default createGlobalStyle`
   }
 
   body {
-    background: #7159c1;
+    background: linear-gradient(-180deg, #24292E, #1C2426, #182121);
     -webkit-font-smoothing: antialiased !important;
   }
 
@@ -25,5 +26,9 @@ export default createGlobalStyle`
 
   button {
     cursor: pointer;
+  }
+
+  a {
+    text-decoration: none;
   }
 `;

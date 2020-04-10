@@ -1,98 +1,182 @@
-import React, { Component } from 'react';
-import { FaGithubAlt, FaPlus, FaSpinner } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import {
+  FaGithubAlt,
+  FaPlus,
+  FaSpinner,
+  FaFilter,
+  FaSearch,
+  FaArrowLeft,
+  FaArrowRight,
+} from 'react-icons/fa';
+
 import { Link } from 'react-router-dom';
 
+import { toast } from 'react-toastify';
 import api from '../../services/api';
-import Container from '../../components/Container';
-import { Form, SubmitButton, List } from './styles';
+import {
+  Container,
+  Form,
+  SubmitButton,
+  List,
+  SortButton,
+  TotalContainer,
+  LoadingContainer,
+  Avatar,
+  RepositoryName,
+  RepositoryOwner,
+  RepositoryItem,
+  RepositoryInfo,
+  PageChanger,
+  PreviousPage,
+  NextPage,
+} from './styles';
 
-export default class Main extends Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      newRepo: '',
-      repositories: [],
-      loading: false,
-    };
-  }
-
-  // Carregar os dados do localStorage
-  componentDidMount() {
-    const repositories = localStorage.getItem('repositories');
-
-    if (repositories) {
-      this.setState({ repositories: JSON.parse(repositories) });
-    }
-  }
+export default function Main() {
+  const [querySearch, setQuerySearch] = useState('');
+  const [searchResult, setSearchResult] = useState('');
+  const [repositories, setRepositories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRepositories, setTotalRepositories] = useState(0);
+  const [prevButton, setPrevButton] = useState(false);
+  const [nextButton, setNextButton] = useState(false);
 
   // Salvar os dados do localStorage
-  componentDidUpdate(_, prevState) {
-    const { repositories } = this.state;
+  /*
+  useEffect(() => {
+    const localRepositories = localStorage.getItem('repositories');
 
-    if (prevState.repositories !== repositories) {
+    if (localRepositories !== repositories) {
       localStorage.setItem('repositories', JSON.stringify(repositories));
     }
+  }, [repositories]);
+  */
+
+  function handleInputChange(e) {
+    setQuerySearch(e.target.value);
   }
 
-  handleInputChange = e => {
-    this.setState({ newRepo: e.target.value });
-  };
+  async function loadRepositories(query, page) {
+    const response = await api.get(
+      `repositories?q=${query}&page=${page}&per_page=8`
+    );
 
-  handleSubmit = async e => {
+    return response;
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
 
-    this.setState({ loading: true });
+    setLoading(true);
+    setSearchResult('');
+    setTotalRepositories(0);
+    setRepositories([]);
 
-    const { newRepo, repositories } = this.state;
+    const response = await loadRepositories(querySearch, currentPage);
 
-    const response = await api.get(`/repos/${newRepo}`);
+    const { items, total_count: totalCount } = response.data;
 
-    const data = {
-      name: response.data.full_name,
-    };
+    if (totalCount === 0) {
+      toast.error('No repository found, try again!');
+    }
 
-    this.setState({
-      repositories: [...repositories, data],
-      newRepo: '',
-      loading: false,
-    });
-  };
+    setRepositories(items);
+    setSearchResult(querySearch);
+    setQuerySearch('');
+    setLoading(false);
+    setTotalRepositories(totalCount);
+  }
 
-  render() {
-    const { newRepo, repositories, loading } = this.state;
+  async function handlePrevPage() {
+    const page = currentPage - 1;
 
-    return (
-      <Container>
-        <h1>
-          <FaGithubAlt />
-          Repositórios
-        </h1>
-        <Form onSubmit={this.handleSubmit}>
-          <input
-            type="text"
-            placeholder="Adicionar repositório"
-            value={newRepo}
-            onChange={this.handleInputChange}
-          />
-          <SubmitButton loading={loading}>
-            {loading ? (
-              <FaSpinner color="#fff" size={14} />
-            ) : (
-              <FaPlus color="#fff" size={14} />
-            )}
-          </SubmitButton>
-        </Form>
-        <List>
-          {repositories.map(repo => (
-            <li key={repo.name}>
-              <span>{repo.name}</span>
+    if (currentPage === 1) {
+      setPrevButton(false);
+      return;
+    }
+
+    setPrevButton(true);
+
+    setCurrentPage(page);
+
+    const response = await loadRepositories(searchResult, page);
+
+    setRepositories(response.data.items);
+  }
+
+  async function handleNextPage() {
+    const page = currentPage + 1;
+
+    setCurrentPage(page);
+
+    const response = await loadRepositories(searchResult, page);
+
+    setRepositories(response.data.items);
+  }
+
+  return (
+    <Container>
+      <h1>
+        <FaGithubAlt />
+        Search repositories
+      </h1>
+      <Form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          placeholder="Type repository name"
+          value={querySearch}
+          onChange={handleInputChange}
+        />
+        <SubmitButton loading={loading}>
+          {loading ? (
+            <FaSpinner color="#fff" size={14} />
+          ) : (
+            <FaPlus color="#fff" size={14} />
+          )}
+        </SubmitButton>
+        <SortButton>
+          <FaFilter />
+        </SortButton>
+      </Form>
+      {totalRepositories ? (
+        <TotalContainer>
+          <h1>
+            <FaSearch />
+            Repositories found: {totalRepositories}
+          </h1>
+        </TotalContainer>
+      ) : null}
+      <List>
+        {loading ? (
+          <LoadingContainer loading={loading}>
+            <FaSpinner color="#000" size={64} />
+          </LoadingContainer>
+        ) : (
+          repositories.map(repo => (
+            <RepositoryItem key={repo.id}>
+              <Avatar src={repo.owner.avatar_url} alt="avatar" />
+              <RepositoryInfo>
+                <RepositoryName>{repo.name}</RepositoryName>
+                <RepositoryOwner>{repo.owner.login}</RepositoryOwner>
+              </RepositoryInfo>
               <Link to={`/repository/${encodeURIComponent(repo.name)}`}>
                 Detalhes
               </Link>
-            </li>
-          ))}
-        </List>
-      </Container>
-    );
-  }
+            </RepositoryItem>
+          ))
+        )}
+      </List>
+      {totalRepositories ? (
+        <PageChanger>
+          <PreviousPage disabled={prevButton} onClick={handlePrevPage}>
+            <FaArrowLeft />
+          </PreviousPage>
+          <h2>Page {currentPage}</h2>
+          <NextPage disabled={nextButton} onClick={handleNextPage}>
+            <FaArrowRight />
+          </NextPage>
+        </PageChanger>
+      ) : null}
+    </Container>
+  );
 }
